@@ -1,0 +1,103 @@
+package banking_system4;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Scanner;
+
+public class BankingSystemUser {
+
+    public static void main(String[] args) {
+
+        DatabaseHandler db = null;
+        Scanner scanner = null;
+
+        try {
+            db = new DatabaseHandler();
+
+            scanner = new Scanner(System.in);
+
+            System.out.println("Enter card ID: ");
+            String cardId = scanner.nextLine();
+
+            System.out.println("Enter password: ");
+            String password = scanner.nextLine();
+
+            // Validate user
+            ResultSet rs = db.executeQuery("SELECT hashed_password, salt, balance FROM users WHERE card_id='" + cardId + "'");
+            if (!rs.next()) {
+                System.out.println("Invalid card ID");
+            } else {
+                String storedHashedPassword = rs.getString("hashed_password");
+                String salt = rs.getString("salt");
+                double balance = rs.getDouble("balance");
+
+                // compute hash of user entered password and salt from database
+                String userEnteredHashedPassword = HashUtil.hashPassword(password, salt);
+
+                if (!storedHashedPassword.equals(userEnteredHashedPassword)) {
+                    System.out.println("Invalid password");
+                } else {
+                    // User authenticated, perform user operations
+                    System.out.println("User authentication successful");
+
+                    boolean exit = false;
+                    while (!exit) {
+                        System.out.println("Please select an option:");
+                        System.out.println("1. Check balance");
+                        System.out.println("2. Deposit");
+                        System.out.println("3. Withdraw");
+                        System.out.println("4. Transfer");
+                        System.out.println("5. Exit");
+
+                        int option = scanner.nextInt();
+                        scanner.nextLine();  // consume newline character
+
+                        switch (option) {
+                            case 1:
+                                System.out.println("Your balance is: " + balance);
+                                break;
+                            case 2:
+                                System.out.println("Enter deposit amount: ");
+                                double depositAmount = scanner.nextDouble();
+                                balance += depositAmount;
+                                db.executeUpdate("UPDATE users SET balance=" + balance + " WHERE card_id='" + cardId + "'");
+                                insertTransaction(db, cardId, depositAmount);
+                                System.out.println("Deposit successful. Your new balance is " + balance);
+                                break;
+                            case 3:
+                                System.out.println("Enter withdrawal amount: ");
+                                double withdrawalAmount = scanner.nextDouble();
+                                if (withdrawalAmount > balance) {
+                                    System.out.println("Insufficient funds");
+                                } else {
+                                    balance -= withdrawalAmount;
+                                    db.executeUpdate("UPDATE users SET balance=" + balance + " WHERE card_id='" + cardId + "'");
+                                    insertTransaction(db, cardId, -withdrawalAmount);
+                                    System.out.println("Withdrawal successful. Your new balance is " + balance);
+                                }
+                                break;
+                            case 4:
+                                System.out.println("Enter recipient card ID: ");
+                                String recipientCardId = scanner.nextLine();
+                                System.out.println("Enter transfer amount: ");
+                                double transferAmount = scanner.nextDouble();
+                                if (transferAmount > balance) {
+                                    System.out.println("Insufficient funds");
+                                } else {
+                                    balance -= transferAmount;
+                                    db.executeUpdate("UPDATE users SET balance=" + balance + " WHERE card_id='" + cardId + "'");
+                                    insertTransaction(db, cardId, recipientCardId, transferAmount, balance);
+                                    System.out.println("Transfer successful. Your new balance is " + balance);
+                                }
+                                break;
+                            case 5:
+                                exit = true;
+                                break;
+                            default:
+                                System.out.println("Invalid option");
+                        }
+                    }
+                }
+            }
+
+        } catch (ClassNotFoundException e
